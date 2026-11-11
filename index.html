@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echo Shot Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* One dark world: an ink room lit by coral targets and cyan echoes.
+     Layout: the playable phone is the hero on the left; the designer's notes read beside it. */
+  --ink: #0b0e1a;
+  --panel: #131833;
+  --line: #262d52;
+  --text: #e9ecf8;
+  --muted: #9aa2c6;
+  --echo: #5ef2e6;
+  --coral: #ff5a4e;
+  --civ: #ffd36b;
+  --display: "Bungee", "Impact", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+a { color: var(--echo); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--echo); outline-offset: 3px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px clamp(16px, 4vw, 40px); border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.top strong { color: var(--text); font-weight: 700; }
+.wrap { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px);
+  padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) 56px; max-width: 1180px; margin: 0 auto; align-items: start; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } .notes { order: 2; } }
+
+/* phone */
+.phone { position: relative; width: 100%; max-width: 420px; aspect-ratio: 9 / 16; max-height: 82vh; margin: 0 auto;
+  border-radius: 34px; padding: 10px; background: #050711; border: 1px solid var(--line);
+  box-shadow: 0 30px 80px -30px rgba(94, 242, 230, .25), 0 0 0 6px #10142a; }
+@media (max-height: 820px) and (min-width: 861px) { .phone { width: auto; height: 82vh; } }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 26px; overflow: hidden; background: var(--ink); touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { display: block; width: 100%; height: 100%; }
+.overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  text-align: center; padding: 28px; background: rgba(8, 10, 22, .78); backdrop-filter: blur(3px); }
+.overlay.show { display: flex; }
+.overlay h2 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; margin: 0; letter-spacing: .02em;
+  text-shadow: -4px 0 rgba(94, 242, 230, .55), -8px 0 rgba(94, 242, 230, .25); }
+.overlay p { margin: 0; color: var(--muted); max-width: 30ch; }
+.stars { font-size: 34px; letter-spacing: 6px; color: var(--civ); }
+.stars .off { color: #39406a; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.btn { font: 700 16px var(--body); border-radius: 999px; padding: 12px 22px; border: 1px solid var(--echo); cursor: pointer;
+  background: var(--echo); color: #06201e; }
+.btn.ghost { background: transparent; color: var(--echo); }
+.levels-in { display: contents; }
+.lv.mute { color: var(--muted); }
+
+.levels { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px auto 0; max-width: 420px; justify-content: center; }
+.lv { font: 600 13px var(--body); color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 10px; cursor: pointer; min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; }
+.lv small { display: block; color: var(--civ); font-size: 11px; letter-spacing: 2px; }
+.lv[aria-current="true"] { border-color: var(--echo); box-shadow: inset 0 0 0 1px var(--echo); }
+.howto { max-width: 420px; margin: 14px auto 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+/* notes */
+.kicker { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.title { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 8vw, 88px); line-height: .92; margin: 0 0 18px;
+  letter-spacing: .01em; color: var(--text);
+  text-shadow: -6px 0 rgba(94, 242, 230, .55), -12px 0 rgba(94, 242, 230, .28), -18px 0 rgba(94, 242, 230, .12); }
+.pitch { font-size: 20px; line-height: 1.45; max-width: 36ch; margin: 0 0 28px; text-wrap: balance; }
+.pitch em { font-style: normal; color: var(--echo); }
+.notes h3 { font-family: var(--body); font-weight: 700; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--coral);
+  margin: 30px 0 10px; }
+.notes p, .notes li { max-width: 62ch; color: #c9cee6; }
+.notes ul { padding-left: 20px; margin: 0; }
+.notes li { margin-bottom: 6px; }
+.loop { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .loop { grid-template-columns: 1fr; } }
+.loop li { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 0; }
+.loop b { display: block; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--echo); line-height: 1; margin-bottom: 6px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 4px; }
+.fact { border-top: 2px solid var(--line); padding-top: 8px; }
+.fact b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; color: var(--text); }
+.fact span { font-size: 13px; color: var(--muted); }
+.foot { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div><strong>Mohamed Mady</strong> · AI game prototypes · Vilnius</div>
+  <div>Contact: <a href="mailto:mo.maady26@gmail.com">mo.maady26@gmail.com</a></div>
+</header>
+
+<main class="wrap">
+  <section aria-label="Playable prototype">
+    <div class="phone">
+      <div class="screen" id="screen">
+        <canvas id="cv" aria-label="Echo Shot game"></canvas>
+        <div class="overlay show" id="ovStart">
+          <h2>ECHO SHOT</h2>
+          <p>You get one bullet per loop. When time rewinds, every shot you fired replays as an echo.</p>
+          <div class="btns"><button class="btn" id="bStart">Play</button></div>
+        </div>
+        <div class="overlay" id="ovWin">
+          <h2>ROOM CLEAR</h2>
+          <div class="stars" id="winStars"></div>
+          <p id="winText"></p>
+          <div class="btns"><button class="btn ghost" id="bReplay">Replay</button><button class="btn" id="bNext">Next level</button></div>
+        </div>
+        <div class="overlay" id="ovFail">
+          <h2 id="failTitle">OUT OF ECHOES</h2>
+          <p id="failText"></p>
+          <div class="btns"><button class="btn" id="bRetry">Try again</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="levels"><nav class="levels-in" id="levels" aria-label="Levels"></nav><button class="lv mute" id="bMute" aria-pressed="false">Sound on</button></div>
+    <p class="howto">Press and hold to aim (time slows down), release to fire. Works with touch or mouse.</p>
+  </section>
+
+  <section class="notes">
+    <p class="kicker">Prototype 01 · Puzzle shooter · Mobile, portrait</p>
+    <h1 class="title">ECHO<br>SHOT</h1>
+    <p class="pitch">A one-thumb shooter where every missed second comes back. Fire once, rewind, and <em>your past shots fire with you</em>.</p>
+
+    <h3>Core loop</h3>
+    <ol class="loop">
+      <li><b>Aim</b>Hold to slow time and line up a shot. Bullets pierce and bounce twice.</li>
+      <li><b>Rewind</b>The loop ends and the room resets. Your shot is now an echo on the timeline.</li>
+      <li><b>Stack</b>Fire again alongside your echoes until every target falls in the same loop.</li>
+    </ol>
+
+    <h3>Why it could work</h3>
+    <ul>
+      <li>It keeps the feel of an action shooter (slow-mo aim, one decisive shot) in a 20 to 40 second level.</li>
+      <li>The rewind turns a reflex game into a planning puzzle, so it suits players who like puzzle and casual games too.</li>
+      <li>Stars reward fewer loops, which gives skilled players a reason to replay without blocking anyone.</li>
+      <li>Levels are cheap to author: a level is a short list of walls, targets and paths.</li>
+    </ul>
+
+    <h3>What this build has</h3>
+    <div class="facts">
+      <div class="fact"><b>8</b><span>handmade levels</span></div>
+      <div class="fact"><b>4</b><span>mechanics: pierce, bounce, movers, civilians</span></div>
+      <div class="fact"><b>100%</b><span>levels checked solvable by a solver script</span></div>
+    </div>
+
+    <h3>Next tests</h3>
+    <ul>
+      <li>Hybrid-casual layer: upgrades between levels (a third bounce, a split shot, a slower echo) and echo skins.</li>
+      <li>Boss rooms where the boss moves differently each loop, so echoes must be re-planned.</li>
+      <li>A daily timeline puzzle with a shared par for every player.</li>
+      <li>Measure level 1 to 3 completion, where players fail, and how often they retry for stars.</li>
+    </ul>
+
+    <h3>How it was built</h3>
+    <p>Prototype by Mohamed Mady, built with Claude (AI) in one session: concept, then a playable build, then level tuning. A small solver script fires thousands of test shots per level to confirm each one can be beaten and to set the star targets.</p>
+
+    <p class="foot">Made as a prototype sample for an AI Game Prototyper application · November 2026</p>
+  </section>
+</main>
+
+<script>
+// Echo Shot — deterministic core (shared by the game and the level solver)
+const ES = (() => {
+  const W = 360, H = 640;
+  const ARENA = { x0: 12, y0: 84, x1: 348, y1: 612 };
+  const STEP = 1 / 480;          // fixed simulation step (seconds of loop time)
+  const SPEED = 760;             // bullet speed, px/s
+  const BR = 3.5;                // bullet radius
+  const ER = 15;                 // enemy / civilian radius
+  const MAX_BOUNCES = 2;
+
+  const LEVELS = [
+    { name: "First Echo", hint: "Drag to aim. Release to fire.",
+      loopTime: 4, maxLoops: 1, stars3: 1, walls: [],
+      enemies: [{ p: [180, 210] }], civs: [] },
+    { name: "Rewind", hint: "One bullet per loop. When time rewinds, your last shot replays as an echo.",
+      loopTime: 4, maxLoops: 2, stars3: 2, walls: [[150, 300, 60, 18]],
+      enemies: [{ p: [70, 190] }, { p: [292, 250] }], civs: [] },
+    { name: "Line Up", hint: "Bullets pierce. Hit all three with one shot for 3 stars.",
+      loopTime: 4, maxLoops: 3, stars3: 1, walls: [],
+      enemies: [{ p: [234, 391] }, { p: [270, 265] }, { p: [306, 139] }], civs: [] },
+    { name: "Bank Shot", hint: "Bullets bounce off walls twice. Use the side wall.",
+      loopTime: 4, maxLoops: 1, stars3: 1, walls: [[60, 330, 240, 18]],
+      enemies: [{ p: [180, 190] }], civs: [] },
+    { name: "Civilians", hint: "Yellow means civilian. Hit one and the run is over.",
+      loopTime: 4, maxLoops: 3, stars3: 2, walls: [],
+      enemies: [{ p: [92, 200] }, { p: [268, 200] }, { p: [50, 330], to: [310, 330], period: 3.2 }],
+      civs: [{ p: [180, 200] }, { p: [180, 420] }] },
+    { name: "Crossing", hint: "They pass each other once per loop. Wait for it.",
+      loopTime: 4, maxLoops: 2, stars3: 1, walls: [[12, 400, 120, 16], [228, 400, 120, 16]],
+      enemies: [{ p: [40, 200], to: [320, 200], period: 4 }, { p: [320, 290], to: [40, 290], period: 4 }], civs: [] },
+    { name: "Corner Pocket", hint: "Two bounces reach places one can't.",
+      loopTime: 4.5, maxLoops: 3, stars3: 2, walls: [[12, 260, 130, 16], [218, 260, 130, 16], [150, 440, 60, 60]],
+      enemies: [{ p: [44, 130] }, { p: [316, 130] }, { p: [180, 170], to: [180, 230], period: 2 }], civs: [{ p: [180, 120] }] },
+    { name: "Echo Chamber", hint: "Every loop adds a gun. Plan the whole timeline.",
+      loopTime: 4.5, maxLoops: 4, stars3: 2, walls: [[90, 330, 180, 16]],
+      enemies: [{ p: [40, 150], to: [320, 150], period: 3 }, { p: [320, 230], to: [40, 230], period: 3.6 },
+                { p: [60, 450] }, { p: [300, 470] }],
+      civs: [{ p: [180, 260], to: [180, 300], period: 2.4 }] },
+  ];
+  const PLAYER = [180, 580];
+
+  function tri(f) { f = f - Math.floor(f); return f < 0.5 ? 2 * f : 2 - 2 * f; }
+  function posAt(e, t) {
+    if (!e.to) return e.p;
+    const u = tri(t / e.period + (e.phase || 0));
+    return [e.p[0] + (e.to[0] - e.p[0]) * u, e.p[1] + (e.to[1] - e.p[1]) * u];
+  }
+
+  // advance one bullet by one STEP; returns false if it died
+  function stepBullet(b, walls) {
+    const ox = b.x, oy = b.y;
+    let nx = ox + b.vx * STEP, ny = oy + b.vy * STEP;
+    let bounced = false;
+    if (nx < ARENA.x0 + BR || nx > ARENA.x1 - BR) { b.vx = -b.vx; nx = ox; bounced = true; }
+    if (ny < ARENA.y0 + BR || ny > ARENA.y1 - BR) { b.vy = -b.vy; ny = oy; bounced = true; }
+    if (!bounced) {
+      for (const w of walls) {
+        const x0 = w[0] - BR, y0 = w[1] - BR, x1 = w[0] + w[2] + BR, y1 = w[1] + w[3] + BR;
+        if (nx > x0 && nx < x1 && ny > y0 && ny < y1) {
+          if (ox <= x0 || ox >= x1) b.vx = -b.vx; else b.vy = -b.vy;
+          nx = ox; ny = oy; bounced = true; break;
+        }
+      }
+    }
+    if (bounced) { b.bounces++; b.bx = ox; b.by = oy; if (b.bounces > MAX_BOUNCES) { b.dead = true; return false; } }
+    b.x = nx; b.y = ny;
+    return true;
+  }
+
+  function makeBullet(shot, player) {
+    return { x: player[0], y: player[1], vx: Math.cos(shot.a) * SPEED, vy: Math.sin(shot.a) * SPEED,
+             bounces: 0, dead: false, shot, trail: [] };
+  }
+
+  // Simulation of one loop. shots: [{t, a, loop}] spawn at their t. Call advance(toT).
+  function createSim(level, shots) {
+    const sim = {
+      t: 0, level, shots: shots.slice(), bullets: [], spawned: new Set(),
+      alive: level.enemies.map(() => true), killedAt: level.enemies.map(() => null),
+      civHit: null, events: [],
+    };
+    sim.addShot = (shot) => { sim.shots.push(shot); };
+    sim.advance = (toT) => {
+      while (sim.t + STEP <= toT + 1e-9 && sim.civHit === null) {
+        sim.t += STEP;
+        for (let i = 0; i < sim.shots.length; i++) {
+          const s = sim.shots[i];
+          if (!sim.spawned.has(i) && s.t <= sim.t + 1e-9) {
+            sim.spawned.add(i); sim.bullets.push(makeBullet(s, PLAYER));
+            sim.events.push({ type: "fire", shot: s, t: sim.t });
+          }
+        }
+        for (const b of sim.bullets) {
+          if (b.dead) continue;
+          const ok = stepBullet(b, level.walls);
+          if (!ok) { sim.events.push({ type: "fizzle", x: b.x, y: b.y }); continue; }
+          if (b.bounces && b.bx !== undefined) { sim.events.push({ type: "bounce", x: b.bx, y: b.by }); b.bx = undefined; }
+          level.enemies.forEach((e, k) => {
+            if (!sim.alive[k]) return;
+            const p = posAt(e, sim.t);
+            const dx = p[0] - b.x, dy = p[1] - b.y;
+            if (dx * dx + dy * dy < (ER + BR) ** 2) {
+              sim.alive[k] = false; sim.killedAt[k] = { t: sim.t, x: p[0], y: p[1], vx: b.vx, vy: b.vy, ghost: b.shot.ghost };
+              sim.events.push({ type: "kill", k, x: p[0], y: p[1], vx: b.vx, vy: b.vy, ghost: b.shot.ghost });
+            }
+          });
+          level.civs.forEach((c, k) => {
+            const p = posAt(c, sim.t);
+            const dx = p[0] - b.x, dy = p[1] - b.y;
+            if (dx * dx + dy * dy < (ER + BR) ** 2 && sim.civHit === null) {
+              sim.civHit = { k, x: p[0], y: p[1] }; sim.events.push({ type: "civ", k, x: p[0], y: p[1] });
+            }
+          });
+        }
+      }
+    };
+    return sim;
+  }
+
+  // Predicted path for the aim guide (ignores enemies)
+  function predictPath(level, a, maxLen) {
+    const b = makeBullet({ a }, PLAYER);
+    const pts = [[b.x, b.y]]; let len = 0, bounces = 0;
+    const stepLen = SPEED * STEP;
+    while (len < maxLen && !b.dead) {
+      if (!stepBullet(b, level.walls)) break;
+      len += stepLen;
+      if (b.bounces !== bounces) { bounces = b.bounces; pts.push([b.x, b.y, 1]); }
+    }
+    pts.push([b.x, b.y]);
+    return pts;
+  }
+
+  return { W, H, ARENA, STEP, SPEED, BR, ER, MAX_BOUNCES, LEVELS, PLAYER, posAt, createSim, predictPath };
+})();
+
+
+</script>
+<script>
+(() => {
+  const { W, H, ARENA, STEP, ER, LEVELS, PLAYER, posAt, createSim, predictPath } = ES;
+  const C = { ink: "#0b0e1a", grid: "#141a35", wall: "#2b3364", wallTop: "#46509a", text: "#e9ecf8", muted: "#9aa2c6",
+              echo: "#5ef2e6", coral: "#ff5a4e", coralDark: "#a3261f", civ: "#ffd36b", white: "#ffffff" };
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), screen = document.getElementById("screen");
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- persistence (best effort) ----------
+  let best = LEVELS.map(() => 0);
+  try { const s = JSON.parse(localStorage.getItem("echoshot-stars") || "null"); if (Array.isArray(s)) best = LEVELS.map((_, i) => s[i] || 0); } catch (e) {}
+  const saveBest = () => { try { localStorage.setItem("echoshot-stars", JSON.stringify(best)); } catch (e) {} };
+
+  // ---------- audio ----------
+  let ac = null, muted = false;
+  function audio() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } } return ac; }
+  function tone(f0, f1, dur, type, vol) {
+    if (muted || !ac) return;
+    try {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+      o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  const sfx = {
+    fire: () => tone(900, 120, 0.12, "square", 0.06),
+    echo: () => tone(1400, 500, 0.10, "triangle", 0.035),
+    kill: () => { tone(220, 60, 0.18, "sawtooth", 0.07); tone(660, 990, 0.08, "sine", 0.04); },
+    bounce: () => tone(1800, 1200, 0.04, "sine", 0.025),
+    rewind: () => tone(700, 90, 0.55, "sawtooth", 0.04),
+    win: () => { tone(523, 523, 0.12, "triangle", 0.06); setTimeout(() => tone(784, 784, 0.18, "triangle", 0.06), 110); },
+    fail: () => tone(300, 70, 0.4, "square", 0.05),
+  };
+
+  // ---------- state ----------
+  let G = null;           // current run
+  let particles = [], rings = [], shake = 0, flash = 0;
+
+  function startLevel(li) {
+    G = { li, L: LEVELS[li], loop: 1, echoes: [], phase: "ready", aim: -Math.PI / 2, aiming: false, fired: false,
+          sim: null, scale: 1, rewindT: 0, endT: 0, hintT: 0, lastKillSlow: 0 };
+    particles = []; rings = [];
+    startLoop();
+    hideOverlays(); renderLevelChips();
+    snapshot();
+  }
+  function startLoop() {
+    G.sim = createSim(G.L, G.echoes.map((s) => ({ ...s, ghost: true })));
+    G.fired = false; G.phase = "ready"; G.aiming = false; G.current = null; G.ff = false;
+  }
+  function liveCount() { return G.sim.alive.filter(Boolean).length; }
+
+  // ---------- input ----------
+  function toLogical(ev) {
+    const r = cv.getBoundingClientRect(), s = view.s;
+    return [((ev.clientX - r.left) * (cv.width / r.width) / dpr - view.ox) / s, ((ev.clientY - r.top) * (cv.height / r.height) / dpr - view.oy) / s];
+  }
+  function setAim(ev) {
+    const [x, y] = toLogical(ev);
+    let a = Math.atan2(y - PLAYER[1], x - PLAYER[0]);
+    if (Math.hypot(x - PLAYER[0], y - PLAYER[1]) < 12) return;
+    G.aim = a;
+  }
+  cv.addEventListener("pointerdown", (ev) => {
+    audio(); if (ac && ac.state === "suspended") ac.resume().catch(() => {});
+    if (!G || G.fired || !(G.phase === "ready" || G.phase === "run")) return;
+    cv.setPointerCapture && cv.setPointerCapture(ev.pointerId);
+    G.aiming = true; setAim(ev); if (G.phase === "ready") G.phase = "run";
+    ev.preventDefault();
+  });
+  cv.addEventListener("pointermove", (ev) => { if (G && G.aiming) { setAim(ev); ev.preventDefault(); } });
+  const release = (ev) => {
+    if (!G || !G.aiming) return;
+    G.aiming = false; if (ev && ev.type !== "pointercancel") setAim(ev);
+    const shot = { t: G.sim.t + STEP, a: G.aim, loop: G.loop };
+    G.sim.addShot(shot); G.current = shot; G.fired = true;
+  };
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+
+  // ---------- overlays & chips ----------
+  function hideOverlays() { ["ovStart", "ovWin", "ovFail"].forEach((id) => $(id).classList.remove("show")); }
+  function starsHTML(n) { return [0, 1, 2].map((i) => `<span class="${i < n ? "" : "off"}">★</span>`).join(""); }
+  function renderLevelChips() {
+    $("levels").innerHTML = LEVELS.map((L, i) =>
+      `<button class="lv" data-li="${i}" aria-current="${G && G.li === i}">Level ${i + 1}<small>${"★".repeat(best[i])}${"·".repeat(3 - best[i])}</small></button>`).join("");
+  }
+  $("levels").addEventListener("click", (e) => { const b = e.target.closest(".lv"); if (b) startLevel(+b.dataset.li); });
+  $("bStart").addEventListener("click", () => { audio(); startLevel(G ? G.li : 0); });
+  $("bRetry").addEventListener("click", () => startLevel(G.li));
+  $("bReplay").addEventListener("click", () => startLevel(G.li));
+  $("bNext").addEventListener("click", () => startLevel((G.li + 1) % LEVELS.length));
+  $("bMute").addEventListener("click", () => { muted = !muted; $("bMute").textContent = muted ? "Sound off" : "Sound on"; $("bMute").setAttribute("aria-pressed", String(muted)); });
+
+  function win() {
+    G.phase = "won"; sfx.win();
+    const used = G.loop, stars = used <= G.L.stars3 ? 3 : used <= G.L.stars3 + 1 ? 2 : 1;
+    best[G.li] = Math.max(best[G.li], stars); saveBest(); renderLevelChips(); snapshot();
+    $("winStars").innerHTML = starsHTML(stars);
+    $("winText").textContent = `Cleared in ${used} loop${used > 1 ? "s" : ""}. ${stars < 3 ? `Clear it in ${G.L.stars3} for 3 stars.` : "Perfect timeline."}`;
+    $("bNext").textContent = G.li === LEVELS.length - 1 ? "Back to level 1" : "Next level";
+    setTimeout(() => $("ovWin").classList.add("show"), 450);
+  }
+  function fail(title, text) {
+    G.phase = "failed"; sfx.fail();
+    $("failTitle").textContent = title; $("failText").textContent = text;
+    setTimeout(() => $("ovFail").classList.add("show"), 550);
+  }
+
+  // ---------- effects ----------
+  function burst(x, y, vx, vy, color, n) {
+    const sp = Math.hypot(vx, vy) || 1;
+    for (let i = 0; i < n; i++) {
+      const a = Math.atan2(vy, vx) + (Math.random() - 0.5) * 1.6, s = 60 + Math.random() * 260;
+      particles.push({ x, y, vx: Math.cos(a) * s + (vx / sp) * 40, vy: Math.sin(a) * s + (vy / sp) * 40, life: 0.5 + Math.random() * 0.5, age: 0, color, r: 1.5 + Math.random() * 2.5 });
+    }
+  }
+  function handleEvents() {
+    for (const ev of G.sim.events) {
+      if (ev.type === "fire") {
+        if (ev.shot.ghost) { sfx.echo(); rings.push({ x: PLAYER[0], y: PLAYER[1], age: 0, color: C.echo }); }
+        else { sfx.fire(); rings.push({ x: PLAYER[0], y: PLAYER[1], age: 0, color: C.white }); shake = Math.max(shake, 3); }
+      } else if (ev.type === "kill") {
+        sfx.kill(); burst(ev.x, ev.y, ev.vx, ev.vy, C.coral, 22); burst(ev.x, ev.y, ev.vx, ev.vy, ev.ghost ? C.echo : C.white, 6);
+        shake = Math.max(shake, 7); flash = 0.12;
+        if (liveCount() === 0) G.lastKillSlow = 0.55;
+      } else if (ev.type === "bounce") { sfx.bounce(); burst(ev.x, ev.y, 0, 0, "#cfd6ff", 4); }
+      else if (ev.type === "civ") { burst(ev.x, ev.y, 0, 0, C.civ, 26); shake = 9; }
+      else if (ev.type === "fizzle") { burst(ev.x, ev.y, 0, 0, "#7d86b8", 5); }
+    }
+    G.sim.events.length = 0;
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    if (!G) return;
+    if (G.phase === "run") {
+      let scale = 1;
+      if (G.aiming) scale = 0.22;
+      else if (G.lastKillSlow > 0) { scale = 0.18; G.lastKillSlow -= dt; }
+      else if (G.fired) {
+        const pending = G.sim.shots.some((s, i) => !G.sim.spawned.has(i));
+        const flying = G.sim.bullets.some((b) => !b.dead);
+        scale = (!pending && !flying) ? 4 : 1.35;
+      }
+      G.sim.advance(Math.min(G.L.loopTime, G.sim.t + dt * scale));
+      handleEvents();
+      if (G.sim.civHit !== null) return fail("CIVILIAN HIT", "A civilian was hit, so the run is over. Echoes replay exactly, so plan a cleaner line.");
+      if (liveCount() === 0 && G.lastKillSlow <= 0) return win();
+      if (G.sim.t >= G.L.loopTime - 1e-6 && liveCount() > 0) {
+        if (G.aiming) release();
+        if (G.current) G.echoes.push(G.current);
+        if (G.loop >= G.L.maxLoops) return fail("OUT OF ECHOES", `${liveCount()} target${liveCount() > 1 ? "s" : ""} left. Try a different order or timing.`);
+        G.phase = "rewind"; G.rewindT = 0; G.rewindFrom = G.sim.t; G.deadSnapshot = G.sim.alive.slice(); sfx.rewind();
+      }
+    } else if (G.phase === "rewind") {
+      G.rewindT += dt;
+      if (G.rewindT >= 0.85) { G.loop++; startLoop(); }
+    }
+    for (const p of particles) { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; }
+    particles = particles.filter((p) => p.age < p.life);
+    for (const r of rings) r.age += dt; rings = rings.filter((r) => r.age < 0.45);
+    shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt);
+  }
+
+  // ---------- render ----------
+  let dpr = 1, view = { s: 1, ox: 0, oy: 0 };
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const r = screen.getBoundingClientRect();
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const s = Math.min(r.width / W, r.height / H);
+    view = { s, ox: (r.width - W * s) / 2, oy: (r.height - H * s) / 2 };
+  }
+  window.addEventListener("resize", resize);
+
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+  function drawEnemy(x, y, alive, t, look) {
+    ctx.save(); ctx.translate(x, y);
+    if (!alive) { ctx.globalAlpha = 0.35; ctx.strokeStyle = C.coral; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-7, -7); ctx.lineTo(7, 7); ctx.moveTo(7, -7); ctx.lineTo(-7, 7); ctx.stroke(); ctx.restore(); return; }
+    const bob = Math.sin(t * 6 + x) * 1.2;
+    ctx.fillStyle = "rgba(255,90,78,.18)"; ctx.beginPath(); ctx.arc(0, 0, ER + 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.coral; ctx.beginPath(); ctx.arc(0, bob, ER, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.coralDark; ctx.fillRect(-ER + 3, bob - 3, ER * 2 - 6, 6);
+    const lx = Math.cos(look) * 3, ly = Math.sin(look) * 3;
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-5 + lx, bob - 1 + ly * .5, 2.6, 0, 7); ctx.arc(5 + lx, bob - 1 + ly * .5, 2.6, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  function drawCiv(x, y) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = "rgba(255,211,107,.16)"; ctx.beginPath(); ctx.arc(0, 0, ER + 6, 0, 7); ctx.fill();
+    ctx.fillStyle = C.civ; ctx.beginPath(); ctx.arc(0, 0, ER, 0, 7); ctx.fill();
+    ctx.fillStyle = "#3a2b00"; ctx.font = "700 18px Figtree, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("!", 0, 1);
+    ctx.restore();
+  }
+  function drawPlayer(angle, ghosts) {
+    const [x, y] = PLAYER;
+    for (let i = ghosts; i >= 1; i--) {
+      ctx.strokeStyle = `rgba(94,242,230,${0.55 - i * 0.1})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 16 + i * 6, 0, 7); ctx.stroke();
+    }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    ctx.fillStyle = "#cfd6ff"; rr(6, -4, 24, 8, 3); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = C.white; ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.fill();
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(x + Math.cos(angle) * 5, y + Math.sin(angle) * 5, 3, 0, 7); ctx.fill();
+  }
+
+  function render(now) {
+    const w = cv.width / dpr, h = cv.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = C.ink; ctx.fillRect(0, 0, w, h);
+    const sx = reduce ? 0 : (Math.random() - 0.5) * shake, sy = reduce ? 0 : (Math.random() - 0.5) * shake;
+    ctx.translate(view.ox + sx, view.oy + sy); ctx.scale(view.s, view.s);
+
+    // arena & grid
+    ctx.fillStyle = "#0e1226"; ctx.fillRect(ARENA.x0, ARENA.y0, ARENA.x1 - ARENA.x0, ARENA.y1 - ARENA.y0);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    for (let gx = ARENA.x0; gx <= ARENA.x1; gx += 24) { ctx.beginPath(); ctx.moveTo(gx, ARENA.y0); ctx.lineTo(gx, ARENA.y1); ctx.stroke(); }
+    for (let gy = ARENA.y0; gy <= ARENA.y1; gy += 24) { ctx.beginPath(); ctx.moveTo(ARENA.x0, gy); ctx.lineTo(ARENA.x1, gy); ctx.stroke(); }
+    ctx.strokeStyle = C.wallTop; ctx.lineWidth = 3; ctx.strokeRect(ARENA.x0, ARENA.y0, ARENA.x1 - ARENA.x0, ARENA.y1 - ARENA.y0);
+
+    if (!G) { ctx.setTransform(1, 0, 0, 1, 0, 0); return; }
+    const L = G.L, sim = G.sim;
+    const rewinding = G.phase === "rewind";
+    const rp = rewinding ? Math.min(1, G.rewindT / 0.8) : 0;
+    const ease = 1 - Math.pow(1 - rp, 3);
+    const tDraw = rewinding ? G.rewindFrom * (1 - ease) : sim.t;
+
+    for (const wl of L.walls) {
+      ctx.fillStyle = C.wall; rr(wl[0], wl[1], wl[2], wl[3], 3); ctx.fill();
+      ctx.fillStyle = C.wallTop; ctx.fillRect(wl[0] + 2, wl[1], wl[2] - 4, 3);
+    }
+    // patrol paths
+    ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5;
+    for (const e of L.enemies) if (e.to) { ctx.strokeStyle = "rgba(255,90,78,.35)"; ctx.beginPath(); ctx.moveTo(e.p[0], e.p[1]); ctx.lineTo(e.to[0], e.to[1]); ctx.stroke(); }
+    for (const c of L.civs) if (c.to) { ctx.strokeStyle = "rgba(255,211,107,.35)"; ctx.beginPath(); ctx.moveTo(c.p[0], c.p[1]); ctx.lineTo(c.to[0], c.to[1]); ctx.stroke(); }
+    ctx.setLineDash([]);
+
+    // echo telegraphs: show where each pending echo will fire
+    if (!rewinding) {
+      for (const s of sim.shots) {
+        if (!s.ghost) continue;
+        const dtTo = s.t - sim.t;
+        if (dtTo > 0 && dtTo < 0.9) {
+          const pts = predictPath(L, s.a, 260);
+          ctx.strokeStyle = `rgba(94,242,230,${0.15 + 0.5 * (1 - dtTo / 0.9)})`; ctx.setLineDash([2, 5]); ctx.lineWidth = 2;
+          ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.setLineDash([]);
+        }
+      }
+    }
+
+    // civilians & enemies
+    for (const c of L.civs) { const p = posAt(c, tDraw); drawCiv(p[0], p[1]); }
+    L.enemies.forEach((e, k) => {
+      const p = posAt(e, tDraw);
+      const alive = rewinding ? (G.deadSnapshot[k] || rp > 0.55) : sim.alive[k];
+      const look = Math.atan2(PLAYER[1] - p[1], PLAYER[0] - p[0]);
+      if (rewinding && !G.deadSnapshot[k]) ctx.globalAlpha = Math.min(1, Math.max(0.3, (rp - 0.3) * 2));
+      drawEnemy(p[0], p[1], alive, now / 1000, look);
+      ctx.globalAlpha = 1;
+    });
+
+    // aim guide
+    if (G.aiming) {
+      const pts = predictPath(L, G.aim, 900);
+      let cut = pts.findIndex((p) => p[2]); // first bounce
+      const show = cut === -1 ? pts : pts.slice(0, cut + 1);
+      ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.setLineDash([6, 6]); ctx.lineWidth = 2;
+      ctx.beginPath(); show.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      if (cut !== -1) {
+        const b = pts[cut], nx = pts[cut + 1] || b, len = Math.hypot(nx[0] - b[0], nx[1] - b[1]) || 1, k = Math.min(1, 46 / len);
+        ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0] + (nx[0] - b[0]) * k, b[1] + (nx[1] - b[1]) * k); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    // bullets
+    if (!rewinding) for (const b of sim.bullets) {
+      if (b.dead) continue;
+      b.trail.push([b.x, b.y]); if (b.trail.length > 14) b.trail.shift();
+      const col = b.shot.ghost ? "94,242,230" : "255,255,255";
+      for (let i = 1; i < b.trail.length; i++) {
+        ctx.strokeStyle = `rgba(${col},${i / b.trail.length * 0.7})`; ctx.lineWidth = 3 * i / b.trail.length + 0.5;
+        ctx.beginPath(); ctx.moveTo(b.trail[i - 1][0], b.trail[i - 1][1]); ctx.lineTo(b.trail[i][0], b.trail[i][1]); ctx.stroke();
+      }
+      ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, 7); ctx.fill();
+    }
+
+    drawPlayer(G.aim, G.echoes.length);
+    for (const r of rings) { const k = r.age / 0.45; ctx.strokeStyle = r.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(r.x, r.y, 14 + k * 30, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+    for (const p of particles) { ctx.globalAlpha = 1 - p.age / p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x - p.r / 2, p.y - p.r / 2, p.r, p.r); }
+    ctx.globalAlpha = 1;
+
+    // HUD: title row
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    ctx.fillStyle = C.muted; ctx.font = "600 11px Figtree, sans-serif"; ctx.fillText(`LEVEL ${G.li + 1}`, 14, 26);
+    ctx.fillStyle = C.text; ctx.font = "18px Bungee, Impact, sans-serif"; ctx.fillText(L.name.toUpperCase(), 14, 47);
+    // loop pips
+    ctx.textAlign = "right"; ctx.fillStyle = C.muted; ctx.font = "600 11px Figtree, sans-serif"; ctx.fillText("LOOPS", W - 14, 26);
+    for (let i = 0; i < L.maxLoops; i++) {
+      const cx = W - 20 - i * 16, used = i < G.loop - 1, cur = i === G.loop - 1;
+      ctx.beginPath(); ctx.arc(cx, 41, 5.5, 0, 7);
+      if (used) { ctx.fillStyle = C.echo; ctx.fill(); } else if (cur) { ctx.fillStyle = C.white; ctx.fill(); } else { ctx.strokeStyle = "#4a527f"; ctx.lineWidth = 2; ctx.stroke(); }
+    }
+    // timeline
+    const tx0 = 14, tx1 = W - 14, ty = 64, tl = L.loopTime;
+    ctx.fillStyle = "#1c2244"; rr(tx0, ty - 3, tx1 - tx0, 6, 3); ctx.fill();
+    ctx.fillStyle = rewinding ? C.echo : C.white; rr(tx0, ty - 3, (tx1 - tx0) * Math.min(1, tDraw / tl), 6, 3); ctx.fill();
+    for (const s of sim.shots) {
+      const x = tx0 + (tx1 - tx0) * (s.t / tl);
+      ctx.fillStyle = s.ghost ? C.echo : C.white; ctx.fillRect(x - 1.5, ty - 9, 3, 18);
+    }
+
+    // hint / prompts
+    ctx.textAlign = "center";
+    if (G.phase === "ready") {
+      const pulse = reduce ? 1 : 0.6 + 0.4 * Math.sin(now / 250);
+      ctx.globalAlpha = pulse; ctx.fillStyle = C.text; ctx.font = "700 14px Figtree, sans-serif";
+      ctx.fillText(G.loop === 1 ? "Hold to aim · release to fire" : `Loop ${G.loop} of ${L.maxLoops} · your echoes are ready`, W / 2, ARENA.y1 - 70);
+      ctx.globalAlpha = 1;
+      if (G.loop === 1) wrapText(L.hint, W / 2, ARENA.y0 + 24, 290, 17, C.muted, "500 13px Figtree, sans-serif");
+    }
+    if (rewinding) {
+      ctx.fillStyle = `rgba(94,242,230,${0.10 * (1 - rp)})`; ctx.fillRect(0, 0, W, H);
+      if (!reduce) { ctx.fillStyle = "rgba(94,242,230,.06)"; for (let y = (now / 8) % 6; y < H; y += 6) ctx.fillRect(0, y, W, 2); }
+      ctx.fillStyle = C.echo; ctx.font = "34px Bungee, Impact, sans-serif"; ctx.fillText("REWIND", W / 2 - 3, H / 2 - 4);
+      ctx.fillStyle = C.text; ctx.fillText("REWIND", W / 2, H / 2 - 4);
+      ctx.font = "600 13px Figtree, sans-serif"; ctx.fillStyle = C.muted; ctx.fillText(`Echo ${G.loop} saved · loop ${G.loop + 1} of ${L.maxLoops}`, W / 2, H / 2 + 20);
+    }
+    if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.6})`; ctx.fillRect(0, 0, W, H); }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  function wrapText(text, x, y, maxW, lh, color, font) {
+    ctx.font = font; ctx.fillStyle = color; const words = text.split(" "); let line = "", yy = y;
+    for (const wd of words) { const t = line ? line + " " + wd : wd; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, x, yy); line = wd; yy += lh; } else line = t; }
+    if (line) ctx.fillText(line, x, yy);
+  }
+
+  // ---------- hot reload state ----------
+  function snapshot() { try { window.claude?.hot?.snapshot?.(() => ({ li: G ? G.li : 0, best })); } catch (e) {} }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); render(now);
+    requestAnimationFrame(frame);
+  }
+  function start(data) {
+    resize();
+    if (data && Array.isArray(data.best)) best = LEVELS.map((_, i) => data.best[i] || best[i]);
+    const li = data && Number.isInteger(data.li) ? data.li : 0;
+    G = null; renderLevelChips();
+    // show the first room behind the start card so the page is complete at rest
+    G = { li, L: LEVELS[li], loop: 1, echoes: [], phase: "idle", aim: -Math.PI / 2, aiming: false, fired: false, sim: createSim(LEVELS[li], []), lastKillSlow: 0 };
+    renderLevelChips();
+    requestAnimationFrame(frame);
+  }
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
